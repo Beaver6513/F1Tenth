@@ -1,0 +1,14 @@
+Steps for Disparity extender:
+
+1)  Get the LaserScan readings ###########
+2)  Sweep it for the desired cone radius (< 180°) ##########
+3)  During the sweep, check for disparities (sudden jump in distance, with threshold). ######
+4)  When you encounter one, override the next "half_car_lenght" with the override value, jump to end+1 of disparity ##########
+5)  Do this from left to right and from right to left ########
+6)  Create a structure that contains gap info (gap center, gap depth) #######
+7)  Sweep the modified LaserScan. #######
+8)  Gather gap information with gap recognition algorithm ##########
+9)  Decide wich gap is the deepest one ########
+10) Check the scan < -90° and > 90°. If car distance to wall is < safety cornering threshold, disable steering 
+11) Steer the car accordingly towards the center of said gap if possible
+12) Regulate speed based on turning angle
