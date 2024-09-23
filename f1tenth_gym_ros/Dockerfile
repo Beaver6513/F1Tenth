@@ -36,6 +36,7 @@ RUN apt-get update --fix-missing && \
                        ros-foxy-rviz2
 RUN apt-get -y dist-upgrade
 RUN pip3 install transforms3d
+RUN apt install ros-foxy-slam-toolbox
 
 # f1tenth gym
 RUN git clone https://github.com/f1tenth/f1tenth_gym

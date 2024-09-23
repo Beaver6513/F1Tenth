@@ -53,11 +53,11 @@ class DEGF(Node):
         self.cone_radius = 180
         self.disparity_threshold = 2
         self.isfirst = True
-        self.min_gap_depth = 1
-        self.car_w = 0.8
+        self.min_gap_depth = 5
+        self.car_w = 0.5
         self.max_steer = 50.0
         self.xvel = 0
-        self.max_vel = 12.0
+        self.max_vel = 8.0
         self.clamp = 10
         self.gap_list = []
         self.publisher = self.create_publisher(AckermannDriveStamped, "drive", 10)
@@ -88,30 +88,54 @@ class DEGF(Node):
 
         # ---Scan filtering with disparity extension----------
         if 1:
-            i = 0
-            while i < fs_len - 1:
-                if fscan[i] + self.disparity_threshold < fscan[i + 1]:
-                    alpha = m.degrees(m.atan(self.car_w / 2 / fscan[i]))
-                    index = max(int(alpha * s_per_deg), 1)
-                    for x in range(min(index, fs_len - i)):
-                        fscan[i + x] = fscan[i]
-                    i += index + 1  # Manually increment i by index
-                else:
-                    i += 1  # Standard increment when the condition is not met
+            if 1:
+                i = 0
+                while i < fs_len - 1:
+                    if (
+                        fscan[i] + self.disparity_threshold < fscan[i + 1]
+                        and fscan[i] != 0.0
+                    ):
+                        alpha = m.degrees(m.atan(self.car_w / 2 / fscan[i]))
+                        index = max(int(alpha * s_per_deg), 1)
+                        for x in range(min(index, fs_len - i)):
+                            fscan[i + x] = 0.0  # fscan[i]
+                        i += index + 1  # Manually increment i by index
+                    else:
+                        i += 1  # Standard increment when the condition is not met
 
-            i = fs_len - 1
-            while i > 1:
-                if fscan[i] + self.disparity_threshold < fscan[i - 1]:
-                    alpha = m.degrees(m.atan(self.car_w / 2 / fscan[i]))
-                    index = max(int(alpha * s_per_deg), 1)
-                    for x in range(min(index, i)):
-                        fscan[i - x] = fscan[i]
-                    i -= index + 1  # Manually decrement i by index
-                else:
-                    i -= 1  # Standard decrement when the condition is not met
+            if 1:
+                i = fs_len - 1
+                while i > 1:
+                    if (
+                        fscan[i] + self.disparity_threshold < fscan[i - 1]
+                        and fscan[i] != 0.0
+                    ):
+                        alpha = m.degrees(m.atan(self.car_w / 2 / fscan[i]))
+                        index = max(int(alpha * s_per_deg), 1)
+                        for x in range(min(index, i)):
+                            fscan[i - x] = 0.0  # fscan[i]
+                        i -= index + 1  # Manually decrement i by index
+                    else:
+                        i -= 1  # Standard decrement when the condition is not met
 
         # ---Gap search algorithm------------
         i = 0
+        if 0:
+            while i < fs_len:
+                if fscan[i] > 0.0:  # self.min_gap_depth:
+                    gap_s = i
+                    gap_e = gap_s
+                    max_d = fscan[i]
+                    while i < fs_len and fscan[i] > 0.0:  # self.min_gap_depth:
+                        gap_e += 1
+                        i += 1
+                    max_d = max(fscan[gap_s:gap_e])
+                    max_i = fscan.index(max_d)
+                    if gap_e - gap_s >= 10:
+                        self.gap_list.append(Gap(max_d, gap_s, gap_e, max_i))
+                else:
+                    i += 1
+
         if 1:
             while i < fs_len:
                 if fscan[i] > self.min_gap_depth:
@@ -121,9 +145,9 @@ class DEGF(Node):
                     while i < fs_len and fscan[i] > self.min_gap_depth:
                         gap_e += 1
                         i += 1
-                    max_d = max(fscan)
+                    max_d = max(fscan[gap_s:gap_e])
                     max_i = fscan.index(max_d)
-                    if gap_e - gap_s >= 10:
+                    if gap_e - gap_s >= 6:
                         self.gap_list.append(Gap(max_d, gap_s, gap_e, max_i))
                 else:
                     i += 1
@@ -132,28 +156,32 @@ class DEGF(Node):
         choosen_index = fs_len // 2
         if len(self.gap_list) >= 1:
             choosen_gap = max(self.gap_list, key=lambda x: x.max_depth)
-            crnt_dist = (choosen_gap.start + choosen_gap.end) // 2
-            a = 1
+            a = 0
             if a == 1:
                 choosen_index = choosen_gap.max_i
             else:
-                choosen_index = crnt_dist
+                choosen_index = (choosen_gap.start + choosen_gap.end) // 2
+        else:
+            choosen_index = fscan.index(max(fscan))
+
         steer = (1 / s_per_deg) * (choosen_index - fs_len // 2)
 
-        if 0:
+        is_at_wall = 1.0
+        if 1:
             if any(
                 l < self.car_w / 2 for l in scan[0 : middle_index - int(90 * s_per_deg)]
             ):
-                steer = 0.0
+                is_at_wall = 0.0
             if any(
                 l < self.car_w / 2
                 for l in scan[middle_index + int(90 * s_per_deg) : len(scan)]
             ):
-                steer = 0.0
+                is_at_wall = 0.0
 
-        for x in range(fs_len):
-            if fscan[x] > self.clamp:
-                fscan[x] = self.clamp
+        if 1:
+            for x in range(fs_len):
+                if fscan[x] > self.clamp:
+                    fscan[x] = self.clamp
 
         # ---Drive Message---------
         drive_msg = AckermannDriveStamped()
@@ -174,9 +202,7 @@ class DEGF(Node):
             k=2,
         )
 
-        speed_steer_coefficient = eerp(self.xvel, 0, self.max_vel, 1, 0.1, 7)
-
-        drive_msg.drive.steering_angle = m.radians(steer)  # * speed_steer_coefficient
+        drive_msg.drive.steering_angle = m.radians(steer) * is_at_wall
 
         steer_speed_coefficient = eerp(abs(steer), 0, self.max_steer, 1, 0.2, 5)
 
@@ -186,14 +212,13 @@ class DEGF(Node):
         # ---DEBUG----------------------------------------
         dbg_print("Steer: ", steer)
         dbg_print("Speed: ", self.xvel)
+        dbg_print("Is at wall: ", is_at_wall)
         dbg_print("Max speed: ", self.max_vel)
-        dbg_print("SpStC: ", speed_steer_coefficient)
         dbg_print("StSpC: ", steer_speed_coefficient)
         dbg_print("Target: ", choosen_index)
         dbg_print("Gaps: ", len(self.gap_list))
         for gap in self.gap_list:
             minv = min(fscan[gap.start : gap.end])
-            maxv = max(fscan[gap.start : gap.end])
             dbg_print(
                 "Gap: ",
                 str(gap.start)
@@ -202,7 +227,7 @@ class DEGF(Node):
                 + " | min:"
                 + str(minv)
                 + " max: "
-                + str(maxv),
+                + str(gap.max_depth),
             )
 
         # ---Objects deletion-----
