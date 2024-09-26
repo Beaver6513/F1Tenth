@@ -36,13 +36,16 @@ RUN apt-get update --fix-missing && \
                        ros-foxy-rviz2
 RUN apt-get -y dist-upgrade
 RUN pip3 install transforms3d
-RUN apt install ros-foxy-slam-toolbox
+#RUN apt install ros-foxy-slam-toolbox
+RUN apt install -y ros-foxy-joy*
+RUN pip3 install pyPS4Controller
+RUN apt install -y ros-foxy-rqt-graph
 
 # f1tenth gym
 RUN git clone https://github.com/f1tenth/f1tenth_gym
 RUN cd f1tenth_gym && \
     pip3 install -e .
-RUN pip3 install numpy matplotlib tk
+RUN pip3 install numpy
 
 # ros2 gym bridge
 RUN mkdir -p sim_ws/src/f1tenth_gym_ros
@@ -54,22 +57,43 @@ RUN source /opt/ros/foxy/setup.bash && \
     colcon build
 
 RUN printf '#!/bin/bash\n\
-tmux new-session -d -s mysession\n\
-tmux rename-window -t mysession:0 "Main"\n\
-tmux send-keys -t mysession:0 "colcon build" C-m\n\
-tmux send-keys -t mysession:0 "source /opt/ros/foxy/setup.sh" C-m\n\
-tmux send-keys -t mysession:0 "source install/setup.sh" C-m\n\
-tmux send-keys -t mysession:0 "ros2 launch f1tenth_gym_ros gym_bridge_launch.py" C-m\n\
-tmux split-window -h -t mysession:0\n\
-tmux send-keys -t mysession:0.1 "colcon build" C-m\n\
-tmux send-keys -t mysession:0.1 "source /opt/ros/foxy/setup.sh" C-m\n\
-tmux send-keys -t mysession:0.1 "source install/setup.sh" C-m\n\
-tmux send-keys -t mysession:0.1 "ros2 run f1tenth_gym_ros DEGF" C-m\n\
-tmux select-pane -t mysession:0.0\n\
-tmux attach-session -t mysession' > /sim_ws/start-tmux.sh
+tmux new-session -d -s F1Tenth\n\
+tmux rename-window -t F1Tenth:0 "Joy"\n\
+tmux send-keys -t F1Tenth:0 "colcon build" C-m\n\
+tmux send-keys -t F1Tenth:0 "source /opt/ros/foxy/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0 "source install/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0 "ros2 launch f1tenth_gym_ros gym_bridge_launch.py" C-m\n\
+tmux split-window -h -t F1Tenth:0\n\
+tmux send-keys -t F1Tenth:0.1 "colcon build" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "source /opt/ros/foxy/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "source install/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "ros2 run f1tenth_gym_ros ControllerInputRos" C-m\n\
+tmux split-window -h -t F1Tenth:0\n\
+tmux send-keys -t F1Tenth:0.2 "colcon build" C-m\n\
+tmux send-keys -t F1Tenth:0.2 "source /opt/ros/foxy/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.2 "source install/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.2 "ros2 run joy joy_node 0" C-m\n\
+tmux select-pane -t F1Tenth:0.0\n\
+tmux attach-session -t F1Tenth' > /sim_ws/start-Joy.sh
 
-RUN chmod +x /sim_ws/start-tmux.sh
+RUN printf '#!/bin/bash\n\
+tmux new-session -d -s F1Tenth\n\
+tmux rename-window -t F1Tenth:0 "AI"\n\
+tmux send-keys -t F1Tenth:0 "colcon build" C-m\n\
+tmux send-keys -t F1Tenth:0 "source /opt/ros/foxy/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0 "source install/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0 "ros2 launch f1tenth_gym_ros gym_bridge_launch.py" C-m\n\
+tmux split-window -h -t F1Tenth:0\n\
+tmux send-keys -t F1Tenth:0.1 "colcon build" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "source /opt/ros/foxy/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "source install/setup.sh" C-m\n\
+tmux send-keys -t F1Tenth:0.1 "ros2 run f1tenth_gym_ros DEGF" C-m\n\
+tmux select-pane -t F1Tenth:0.0\n\
+tmux attach-session -t F1Tenth' > /sim_ws/start-AI.sh
+
+RUN chmod +x /sim_ws/start-Joy.sh
+RUN chmod +x /sim_ws/start-AI.sh
 
 WORKDIR '/sim_ws'
-CMD ["start-tmux.sh"]
+#CMD ["start-tmux.sh"]
 ENTRYPOINT ["/bin/bash"]

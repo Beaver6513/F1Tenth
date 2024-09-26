@@ -57,7 +57,7 @@ class DEGF(Node):
         self.car_w = 0.5
         self.max_steer = 50.0
         self.xvel = 0
-        self.max_vel = 8.0
+        self.max_vel = 10.0
         self.clamp = 10
         self.gap_list = []
         self.publisher = self.create_publisher(AckermannDriveStamped, "drive", 10)
